@@ -92,7 +92,7 @@ test('the window-state snapshot flushes too', () => {
 	// fields and the editor has not come down yet.
 	const serialize = sliceFrom(viewer, 'serializeState: () => {');
 	const flushAt = offsetOf(serialize, 'flushPositionTo(tabManager.activeTabId)');
-	const stateAt = offsetOf(serialize, 'return tabManager.serializeState();');
+	const stateAt = offsetOf(serialize, 'tabManager.serializeState()');
 	assert.ok(flushAt < stateAt);
 });
 

@@ -205,13 +205,13 @@ const RULES: Rule[] = [
 		allowed: [],
 	},
 	{
-		name: 'the TOC separator advertises the settings range',
-		why: 'aria-valuemin/max is the bound assistive tech reports; a literal there goes stale silently because no visual check can see it. This is the half of the TOC rule above that a differently-named copy would escape.',
+		name: 'every resize separator advertises its settings range',
+		why: 'aria-valuemin/max is the bound assistive tech reports; a literal there goes stale silently because no visual check can see it. This is the half of the TOC rule above that a differently-named copy would escape. The folder sidebar has the second resizer, bounded by FOLDER_SIDEBAR_WIDTH_RANGE the same way.',
 		marker: /aria-valuemin=/g,
-		allowed: ['src/lib/MarkdownViewer.svelte'],
+		allowed: ['src/lib/MarkdownViewer.svelte', 'src/lib/components/FolderSidebar.svelte'],
 		requires: {
-			pattern: /aria-valuemin=\{TOC_WIDTH_RANGE\.min\}\s*\n\s*aria-valuemax=\{TOC_WIDTH_RANGE\.max\}/,
-			message: 'the resize separator must advertise TOC_WIDTH_RANGE.min/.max, not numbers of its own',
+			pattern: /aria-valuemin=\{(TOC_WIDTH_RANGE|FOLDER_SIDEBAR_WIDTH_RANGE)\.min\}\s*\n\s*aria-valuemax=\{\1\.max\}/,
+			message: 'a resize separator must advertise its settings range (.min/.max), not numbers of its own',
 		},
 	},
 	{

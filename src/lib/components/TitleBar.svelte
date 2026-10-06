@@ -27,6 +27,10 @@
 		showHome,
 		onnewFile,
 		onopenFile,
+		onopenFolder,
+		ontoggleFolderSidebar,
+		hasFolder = false,
+		isFolderSidebarShown = false,
 		onmergeAllWindows,
 		onclosetag,
 		onsaveFile,
@@ -69,6 +73,11 @@
 		showHome: boolean;
 		onnewFile?: () => void;
 		onopenFile?: () => void;
+		onopenFolder?: () => void;
+		ontoggleFolderSidebar?: () => void;
+		/** This window has a folder open, so the sidebar toggle means something. */
+		hasFolder?: boolean;
+		isFolderSidebarShown?: boolean;
 		onmergeAllWindows?: () => void;
 		onclosetag?: () => void;
 		onsaveFile?: () => void;
@@ -518,6 +527,30 @@
 				{t('menu.openFile', currentLanguage)}
 				<span class="menu-shortcut">{shortcutLabel('file-open', modifier)}</span>
 			</button>
+			<button
+				class="home-menu-item"
+				onclick={() => {
+					homeMenuOpen = false;
+					onopenFolder?.();
+				}}>
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+					><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+				{t('folder.openFolder', currentLanguage)}
+				<span class="menu-shortcut">{shortcutLabel('folder-open', modifier)}</span>
+			</button>
+			{#if hasFolder}
+				<button
+					class="home-menu-item"
+					onclick={() => {
+						homeMenuOpen = false;
+						ontoggleFolderSidebar?.();
+					}}>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+						><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+					{t(isFolderSidebarShown ? 'folder.hideSidebar' : 'folder.showSidebar', currentLanguage)}
+					<span class="menu-shortcut">{shortcutLabel('folder-toggle-sidebar', modifier)}</span>
+				</button>
+			{/if}
 					{#if currentFile !== '' || (tabManager.activeTab && tabManager.activeTab.isEditing)}
 						<button
 						class="home-menu-item"

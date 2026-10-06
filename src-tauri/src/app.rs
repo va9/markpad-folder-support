@@ -2,7 +2,7 @@
 //! command registry.
 
 use crate::window_runtime::{AppState, WatcherState};
-use crate::{asset_protocol, commands, tab_transfer, window_runtime};
+use crate::{asset_protocol, commands, folder, tab_transfer, window_runtime};
 use std::fs;
 use tauri::{Emitter, Manager};
 
@@ -25,6 +25,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::new())
         .manage(WatcherState::new())
+        .manage(folder::FolderWatcherState::new())
         .manage(tab_transfer::TabTransferBroker::new())
         // Replaces Tauri's own `asset:` handler so UNC hosts go through
         // `asset_protocol`'s trust rule. Registering the scheme here is what
@@ -252,6 +253,13 @@ pub fn run() {
             commands::copy_file_to_img,
             commands::copy_file,
             commands::list_directory_contents,
+            folder::list_folder,
+            folder::path_is_directory,
+            folder::search_folder_files,
+            folder::create_file,
+            folder::create_directory,
+            folder::watch_folder_dirs,
+            folder::unwatch_folder,
             tab_transfer::stage_detached_tab,
             tab_transfer::claim_detached_tab,
             tab_transfer::complete_detached_tab,

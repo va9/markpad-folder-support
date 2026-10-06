@@ -6,6 +6,8 @@
 		onClick?: () => void;
 		onHover?: () => void;
 		separator?: boolean;
+		/** Draws a check mark before the label: the item is an on/off option. */
+		checked?: boolean;
 	};
 
 	let { show, x, y, items, onhide } = $props<{
@@ -76,7 +78,12 @@
 								onhide();
 							}
 						}}>
-						<span class="action-label">{item.label}</span>
+						<span class="action-label">
+							{#if item.checked !== undefined}
+								<span class="menu-check" aria-hidden="true">{item.checked ? '✓' : ''}</span>
+							{/if}
+							{item.label}
+						</span>
 						{#if item.shortcut}
 							<span class="menu-shortcut">{item.shortcut}</span>
 						{/if}
@@ -155,6 +162,11 @@
 		display: block;
 		text-align: left;
 		white-space: nowrap;
+	}
+
+	.menu-check {
+		display: inline-block;
+		width: 1.2em;
 	}
 
 	.menu-shortcut {

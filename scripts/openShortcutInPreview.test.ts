@@ -63,7 +63,10 @@ test('Shift and Alt do not reach it', () => {
 	// The branch tests `!e.shiftKey && !e.altKey`. Without that, chords the app
 	// has not defined would silently open a file dialog on top of whatever the
 	// user was actually doing.
-	for (const chord of ['Ctrl+Shift+O', 'Alt+Ctrl+O']) {
-		assert.equal(documentKeymap('windows').get(chord), undefined, chord);
-	}
+	// Ctrl+Alt+O is a chord of its own now — Open Folder — which is exactly
+	// what the guard is for: it reaches that command, not this one. (Spelled
+	// in the harness's modifier order; `Alt+Ctrl+O` is a key it never produces,
+	// so asserting on it could not fail.)
+	assert.equal(documentKeymap('windows').get('Ctrl+Shift+O'), undefined, 'Ctrl+Shift+O');
+	assert.equal(documentKeymap('windows').get('Ctrl+Alt+O'), 'open-folder');
 });

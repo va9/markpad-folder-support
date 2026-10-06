@@ -97,17 +97,24 @@ import { normalizeAssetPath } from './utils/exportHtml.js';
 import {
 	dropRecentFile,
 	isRecentFilesStorageEvent,
+	isRecentFoldersStorageEvent,
+	moveRecentFiles,
 	promoteRecentFile,
 	readStoredRecentFiles,
+	readStoredRecentFolders,
 	renameRecentFile,
 	updateStoredRecentFiles,
+	updateStoredRecentFolders,
 } from './utils/recentFiles.js';
 
 	const appWindow = getCurrentWindow();
 
 	import HomePage from './components/HomePage.svelte';
+	import FolderSidebar from './components/FolderSidebar.svelte';
 	import { pinnedTagFromWindowLabel, pinnedTagHolder, pinnedWindowToken } from './utils/pinnedTagWindow.js';
 import { tabManager, type Tab } from './stores/tabs.svelte.js';
+import { folderWorkspace } from './stores/folderWorkspace.svelte.js';
+import { attachFolderToSnapshot, folderFromSnapshot, isDocumentName, remapPath } from './utils/folderTree.js';
 import { snapshotTab } from './utils/tabTransfer.js';
 import { outgoingTabAnchorLine } from './utils/editorPosition.js';
 import { createPaneSlider, planPaneSlide, type PanesShown } from './utils/paneSlide.js';
@@ -136,6 +143,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	let showSettings = $state(false);
 
 	let recentFiles = $state<string[]>([]);
+	let recentFolders = $state<string[]>([]);
 	let isFocused = $state(true);
 	
 	let markdownBody: HTMLElement | null = $state(null);
@@ -647,11 +655,17 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 			// edited would be persisted at the position it held when the editor
 			// last came down. Only the active tab can be the one the editor holds.
 			if (tabManager.activeTabId) editorPane?.flushPositionTo(tabManager.activeTabId);
-			return tabManager.serializeState();
+			// The open folder rides in the same snapshot, so it comes back exactly
+			// when the tabs do.
+			return attachFolderToSnapshot(tabManager.serializeState(), folderWorkspace.root);
 		},
 		shouldRestoreState: () => settings.restoreStateOnReopen,
 		isDisposed: () => isDisposed,
-		restoreState: (json) => tabManager.restoreState(json),
+		restoreState: (json) => {
+			tabManager.restoreState(json);
+			const folder = folderFromSnapshot(json);
+			if (folder) void restoreFolder(folder);
+		},
 		restoredTabs: () => tabManager.tabs.map((tab) => ({ id: tab.id, path: tab.path })),
 		applyRestoredContent: async (tabId, raw) => {
 			const tab = tabManager.tabs.find((item) => item.id === tabId);
@@ -2146,6 +2160,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 
 	function loadRecentFiles() {
 		recentFiles = readStoredRecentFiles();
+		recentFolders = readStoredRecentFolders();
 	}
 
 	function deleteRecentFile(path: string) {
@@ -2162,6 +2177,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		if (typeof window === 'undefined') return;
 		const onStorage = (event: StorageEvent) => {
 			if (isRecentFilesStorageEvent(event)) recentFiles = readStoredRecentFiles();
+			if (isRecentFoldersStorageEvent(event)) recentFolders = readStoredRecentFolders();
 		};
 		window.addEventListener('storage', onStorage);
 		return () => window.removeEventListener('storage', onStorage);
@@ -2171,6 +2187,101 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		event.stopPropagation();
 		deleteRecentFile(path);
 		if (currentFile === path) tabManager.closeTab(tabManager.activeTabId!);
+	}
+
+	// --- Folder sidebar -------------------------------------------------------
+	//
+	// The folder is per window (`folderWorkspace`); the sidebar's visibility and
+	// width are settings. Zen mode hides it with everything else and leaves the
+	// setting alone, so leaving zen brings it back.
+	let isFolderSidebarShown = $derived(folderWorkspace.root !== null && settings.showFolderSidebar && !settings.zenMode);
+
+	async function selectFolder() {
+		const selected = await open({ directory: true, multiple: false });
+		if (typeof selected === 'string' && selected !== '') await openFolder(selected);
+	}
+
+	async function openFolder(path: string) {
+		settings.showFolderSidebar = true;
+		recentFolders = updateStoredRecentFolders((current) => promoteRecentFile(current, path));
+		await folderWorkspace.open(path);
+	}
+
+	function removeRecentFolder(path: string, event: MouseEvent) {
+		event.stopPropagation();
+		recentFolders = updateStoredRecentFolders((current) => dropRecentFile(current, path));
+	}
+
+	/** With no folder open there is nothing to show, so the toggle asks for one. */
+	function toggleFolderSidebar() {
+		if (folderWorkspace.root === null) {
+			void selectFolder();
+			return;
+		}
+		settings.showFolderSidebar = !settings.showFolderSidebar;
+	}
+
+	async function isDirectory(path: string): Promise<boolean> {
+		return invoke<boolean>('path_is_directory', { path }).catch(() => false);
+	}
+
+	/**
+	 * A path from outside the app — argv, a second launch, the macOS dock — may
+	 * name a folder (`markpad ~/notes`). That used to be read as a document and
+	 * fail; it opens the folder now.
+	 */
+	async function openExternalPath(path: string) {
+		if (await isDirectory(path)) return openFolder(path);
+		return loadMarkdown(path);
+	}
+
+	/** A drop that is not a document may still be a folder to open. */
+	async function openIfFolder(path: string): Promise<boolean> {
+		if (!(await isDirectory(path))) return false;
+		await openFolder(path);
+		return true;
+	}
+
+	/**
+	 * A click on a file in the tree. Anything the editor can show — documents,
+	 * and the source files it highlights — opens in a tab; anything else goes to
+	 * the OS default handler, except a file that handler would RUN rather than
+	 * show, which is revealed instead, for the same reason a local link is.
+	 */
+	async function openFromFolderSidebar(path: string) {
+		if (isDocumentName(path) || getLanguage(path) !== 'plaintext') {
+			await loadMarkdown(path);
+			showHome = false;
+			return;
+		}
+		try {
+			if (await invoke<boolean>('is_launchable_path', { path })) {
+				await invoke('open_file_folder', { path });
+				addToast(t('toast.launchableLinkRevealed', settings.language).replace('{{target}}', path), 'info');
+				return;
+			}
+			await openPath(path);
+		} catch (error) {
+			console.error('Failed to open file from the folder sidebar', path, error);
+			addToast(t('toast.openFailed', settings.language).replace('{{target}}', path), 'error');
+		}
+	}
+
+	/**
+	 * The sidebar renamed `from` to `to` on disk. Every tab on that file — or,
+	 * for a folder, on any file inside it — follows, and so do recent files, the
+	 * same bookkeeping the tab-strip rename does for one file.
+	 */
+	function handleFolderEntryRenamed(from: string, to: string) {
+		for (const tab of tabManager.tabs) {
+			const moved = remapPath(tab.path, from, to);
+			if (moved !== null) tabManager.renameTab(tab.id, moved);
+		}
+		recentFiles = updateStoredRecentFiles((current) => moveRecentFiles(current, (file) => remapPath(file, from, to)));
+	}
+
+	async function restoreFolder(path: string) {
+		if (await isDirectory(path)) await folderWorkspace.open(path);
 	}
 
 	async function canCloseTab(tabId: string): Promise<boolean> {
@@ -3350,6 +3461,10 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 				return void handleNewFile();
 			case 'open-file':
 				return void selectFile();
+			case 'open-folder':
+				return void selectFolder();
+			case 'toggle-folder-sidebar':
+				return toggleFolderSidebar();
 			case 'app-exit':
 				return void appExit();
 			case 'toggle-split-view':
@@ -3537,7 +3652,10 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		if (!tab) return;
 
 		const startRatio = tab.splitRatio ?? 0.5;
-		const containerWidth = window.innerWidth;
+		// The panes' own width, not the window's: the folder sidebar can take
+		// part of the window, and a ratio measured against the whole of it would
+		// make the divider trail the pointer.
+		const containerWidth = layoutContainerEl?.clientWidth || window.innerWidth;
 
 		const onMove = (moveEvent: MouseEvent) => {
 			const deltaX = moveEvent.clientX - startX;
@@ -3655,7 +3773,10 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 			const listeners: [string, EventCallback<any>][] = [
 				['file-path', (event) => {
 					const filePath = event.payload as string;
-					if (filePath) loadMarkdown(filePath);
+					if (filePath) openExternalPath(filePath);
+				}],
+				['folder-changed', (event) => {
+					void folderWorkspace.refresh(event.payload as string[]);
 				}],
 				['menu-close-file', () => {
 					closeFile();
@@ -3808,7 +3929,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 										loadMarkdown(path);
 										break;
 									case 'unsupported':
-										reportUnsupportedDrop(path);
+										void openIfFolder(path).then((isFolder) => isFolder || reportUnsupportedDrop(path));
 										break;
 								}
 							});
@@ -3837,7 +3958,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 				try {
 					const args: string[] = await invoke('send_markdown_path');
 					if (!isDisposed && args?.length > 0) {
-						for (const path of args) await loadMarkdown(path);
+						for (const path of args) await openExternalPath(path);
 					}
 				} catch (error) {
 					console.error('Error receiving Markdown file path:', error);
@@ -3877,6 +3998,10 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		zoomLevel={settings.zoomLevel}
 		onnewFile={handleNewFile}
 		onopenFile={selectFile}
+		onopenFolder={selectFolder}
+		ontoggleFolderSidebar={toggleFolderSidebar}
+		hasFolder={folderWorkspace.root !== null}
+		{isFolderSidebarShown}
 		onmergeAllWindows={mergeAllWindowsHere}
 		onclosetag={closeWindowTag}
 		onsaveFile={saveContent}
@@ -3916,6 +4041,10 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		zoomLevel={settings.zoomLevel}
 		onnewFile={handleNewFile}
 		onopenFile={selectFile}
+		onopenFolder={selectFolder}
+		ontoggleFolderSidebar={toggleFolderSidebar}
+		hasFolder={folderWorkspace.root !== null}
+		{isFolderSidebarShown}
 		onmergeAllWindows={mergeAllWindowsHere}
 		onclosetag={closeWindowTag}
 		onsaveFile={saveContent}
@@ -3980,6 +4109,23 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		onreload={resolveExternalChangeByReloading}
 		onkeep={resolveExternalChangeByKeepingBuffer} />
 
+	{#if isFolderSidebarShown}
+		<FolderSidebar
+			activePath={currentFile}
+			onopen={openFromFolderSidebar}
+			onrenamed={handleFolderEntryRenamed}
+			onprompt={promptCustom}
+			onerror={(translated) => addToast(translated, 'error')}
+			oninfo={(translated) => addToast(translated, 'info')} />
+	{/if}
+
+	<!-- Everything the sidebar sits beside. Absolutely positioned like the
+	     layout inside it, so with no sidebar it covers exactly the window and
+	     the layout's own absolute positioning is unchanged. -->
+	<div
+		class="workspace-main"
+		class:with-folder-sidebar={isFolderSidebarShown}
+		style:--folder-sidebar-width="{settings.folderSidebarWidth}px">
 	{#if tabManager.activeTab && !isHomePath(tabManager.activeTab.path) && !showHome}
 			<div
 				class="markdown-container"
@@ -4032,6 +4178,8 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 								zoomLevel={settings.zoomLevel}
 								onnew={handleNewFile}
 								onopen={selectFile}
+								onopenFolder={selectFolder}
+								ontoggleFolderSidebar={toggleFolderSidebar}
 								onclose={closeFile}
 								onreveal={openFileLocation}
 								onexportPdf={exportAsPdf}
@@ -4334,8 +4482,9 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 				</div>
 			</div>
 	{:else}
-		<HomePage {recentFiles} {pinnedTags} onselectFile={selectFile} onloadFile={loadMarkdown} onremoveRecentFile={removeRecentFile} onnewFile={handleNewFile} onopenPinnedTag={openPinnedTag} onunpinTag={unpinTagFromHome} />
+		<HomePage {recentFiles} {recentFolders} {pinnedTags} onselectFile={selectFile} onselectFolder={selectFolder} onopenFolder={openFolder} onremoveRecentFolder={removeRecentFolder} onloadFile={loadMarkdown} onremoveRecentFile={removeRecentFile} onnewFile={handleNewFile} onopenPinnedTag={openPinnedTag} onunpinTag={unpinTagFromHome} />
 	{/if}
+	</div>
 
 	<div 
 		class="tooltip align-{tooltip.align} {tooltip.show ? 'visible' : ''}" 
@@ -4839,6 +4988,15 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 			stroke-dashoffset: -124;
 		}
 	}
+	.workspace-main {
+		position: absolute;
+		inset: 0;
+	}
+
+	.workspace-main.with-folder-sidebar {
+		left: var(--folder-sidebar-width);
+	}
+
 	/* Layout System */
 	.layout-container {
 		display: flex;

@@ -221,6 +221,8 @@ export const PREVIEW_FONT_SIZE_RANGE: NumericSettingRange = { min: 12, max: 48, 
 export const CODE_FONT_SIZE_RANGE: NumericSettingRange = { min: 10, max: 48, step: 1, default: 14 };
 export const EDITOR_MAX_WIDTH_RANGE: NumericSettingRange = { min: 20, max: 500, step: 10, default: 80 };
 export const TOC_WIDTH_RANGE: NumericSettingRange = { min: 180, max: 420, step: 1, default: 240 };
+// Width of the folder sidebar, in pixels. Same role as TOC_WIDTH_RANGE.
+export const FOLDER_SIDEBAR_WIDTH_RANGE: NumericSettingRange = { min: 160, max: 520, step: 1, default: 260 };
 // Preview zoom, in percent. The only place its bounds and default live.
 export const ZOOM_LEVEL_RANGE: NumericSettingRange = { min: 25, max: 500, step: 10, default: 100 };
 
@@ -559,6 +561,15 @@ export class SettingsStore {
 	 */
 	splitEditorSide = $state<'left' | 'right'>('left');
 	tocWidth = $state(TOC_WIDTH_RANGE.default);
+	/**
+	 * The folder sidebar. Shown only while the window has a folder open, so
+	 * this is the user's "hide it for now", not whether a folder is open — that
+	 * is per window and lives in `folderWorkspace`.
+	 */
+	showFolderSidebar = $state(true);
+	folderSidebarWidth = $state(FOLDER_SIDEBAR_WIDTH_RANGE.default);
+	folderShowAllFiles = $state(false);
+	folderShowHidden = $state(false);
 	osType = $state<OSType>('unknown');
 	imageDirectory = $state('img');
 	macosImageScaling = $state(true);
@@ -700,6 +711,10 @@ export class SettingsStore {
 
 	setTocWidth(width: number) {
 		this.tocWidth = clampToRange(width, TOC_WIDTH_RANGE);
+	}
+
+	setFolderSidebarWidth(width: number) {
+		this.folderSidebarWidth = clampToRange(width, FOLDER_SIDEBAR_WIDTH_RANGE);
 	}
 
 	setLanguage(lang: LanguageCode) {
@@ -963,6 +978,10 @@ export function createSettingsPersistence(): PersistedSetting<SettingsStore>[] {
 			},
 		},
 		numberSetting('editor.tocWidth', TOC_WIDTH_RANGE, (s) => s.tocWidth, (s, v) => { s.tocWidth = v; }),
+		booleanSetting('folder.showSidebar', (s) => s.showFolderSidebar, (s, v) => { s.showFolderSidebar = v; }),
+		numberSetting('folder.sidebarWidth', FOLDER_SIDEBAR_WIDTH_RANGE, (s) => s.folderSidebarWidth, (s, v) => { s.folderSidebarWidth = v; }),
+		booleanSetting('folder.showAllFiles', (s) => s.folderShowAllFiles, (s, v) => { s.folderShowAllFiles = v; }),
+		booleanSetting('folder.showHidden', (s) => s.folderShowHidden, (s, v) => { s.folderShowHidden = v; }),
 		stringSetting('editor.imageDirectory', (s) => s.imageDirectory, (s, v) => { s.imageDirectory = v; }),
 		booleanSetting('editor.macosImageScaling', (s) => s.macosImageScaling, (s, v) => { s.macosImageScaling = v; }),
 		{
