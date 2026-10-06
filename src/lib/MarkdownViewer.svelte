@@ -4045,6 +4045,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		ontoggleFolderSidebar={toggleFolderSidebar}
 		hasFolder={folderWorkspace.root !== null}
 		{isFolderSidebarShown}
+		folderSidebarWidth={isFolderSidebarShown ? settings.folderSidebarWidth : 0}
 		onmergeAllWindows={mergeAllWindowsHere}
 		onclosetag={closeWindowTag}
 		onsaveFile={saveContent}

@@ -31,6 +31,7 @@
 		ontoggleFolderSidebar,
 		hasFolder = false,
 		isFolderSidebarShown = false,
+		folderSidebarWidth = 0,
 		onmergeAllWindows,
 		onclosetag,
 		onsaveFile,
@@ -78,6 +79,12 @@
 		/** This window has a folder open, so the sidebar toggle means something. */
 		hasFolder?: boolean;
 		isFolderSidebarShown?: boolean;
+		/**
+		 * Width of the folder sidebar below, or 0 when none is shown. The left
+		 * controls take exactly that width so the tab strip starts where the
+		 * document does, rather than running across the top of the tree.
+		 */
+		folderSidebarWidth?: number;
 		onmergeAllWindows?: () => void;
 		onclosetag?: () => void;
 		onsaveFile?: () => void;
@@ -449,7 +456,11 @@
 	{#if !isMac && !isWin11}
 		<div class="window-top-border"></div>
 	{/if}
-	<div class="window-controls-left" data-tauri-drag-region>
+	<div
+		class="window-controls-left"
+		class:over-folder-sidebar={folderSidebarWidth > 0}
+		style:width={folderSidebarWidth > 0 ? `${folderSidebarWidth}px` : null}
+		data-tauri-drag-region>
 		<div class="home-menu-container" role="presentation">
 			<button
 				class="icon-home-btn {homeMenuOpen ? 'active' : ''}"
@@ -1289,6 +1300,16 @@
 
 	.custom-title-bar.native-mac .window-controls-left {
 		padding-left: 78px;
+	}
+
+	/* The title bar's share of the sidebar column: same width, background and
+	   edge as the sidebar under it, so the two read as one column. */
+	.window-controls-left.over-folder-sidebar {
+		flex: none;
+		align-self: stretch;
+		box-sizing: border-box;
+		background: var(--color-canvas-subtle);
+		border-right: 1px solid var(--color-border-default);
 	}
 
 	.title-actions-container {
