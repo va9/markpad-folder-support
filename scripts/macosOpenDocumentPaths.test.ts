@@ -15,7 +15,9 @@ test('macOS open-document events preserve every delivered file path', () => {
 	assert.match(tauriLib, /startup_files\)\s*\.push\(path_str\.clone\(\)\)/);
 	assert.match(runtime, /startup_files\)\s*\.drain\(\.\.\)\s*\.collect\(\)/);
 	assert.match(runtime, /for path in startup_files\.into_iter\(\)\.rev\(\)/);
-	assert.match(viewer, /for \(const path of args\) await loadMarkdown\(path\);/);
+	// Through `openExternalPath`, which reads a folder as a folder and every
+	// other path as a document, exactly as `loadMarkdown` alone did before.
+	assert.match(viewer, /for \(const path of args\) await openExternalPath\(path\);/);
 });
 
 test('a second launch hands every argv path to the running window', () => {

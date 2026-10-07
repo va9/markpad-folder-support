@@ -5,10 +5,28 @@
 	import { settings } from '../stores/settings.svelte.js';
 	import { duplicateNameSuffixes } from '../utils/duplicateTabNames.js';
 	import { basename } from '../utils/pathIdentity.js';
+	import { folderName } from '../utils/folderTree.js';
 	import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
 
-	let { recentFiles, pinnedTags = [], onselectFile, onloadFile, onremoveRecentFile, onnewFile, onopenPinnedTag, onunpinTag } = $props<{
+	let {
+		recentFiles,
+		recentFolders = [],
+		pinnedTags = [],
+		onselectFile,
+		onselectFolder,
+		onopenFolder,
+		onremoveRecentFolder,
+		onloadFile,
+		onremoveRecentFile,
+		onnewFile,
+		onopenPinnedTag,
+		onunpinTag,
+	} = $props<{
 		recentFiles: string[];
+		recentFolders?: string[];
+		onselectFolder?: () => void;
+		onopenFolder?: (path: string) => void;
+		onremoveRecentFolder?: (path: string, e: MouseEvent) => void;
 		pinnedTags?: Array<{ name: string; color: string; files: string[] }>;
 		onopenPinnedTag?: (tag: { name: string; color: string; files: string[] }) => void;
 		onunpinTag?: (name: string) => void;
@@ -76,7 +94,64 @@
 				stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
 			{t('home.newFile', settings.language)}
 		</button>
+		<button class="fluent-btn secondary" onclick={() => onselectFolder?.()}>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><line x1="2" y1="10" x2="22" y2="10" /></svg>
+			{t('folder.openFolder', settings.language)}
+		</button>
 	</div>
+	{#if settings.showRecentFiles && recentFolders.length > 0}
+		<div class="recent-section">
+			<h3>{t('folder.recentFolders', settings.language)}</h3>
+			<div class="recent-grid">
+				{#each recentFolders as folder (folder)}
+					<div
+						class="recent-card"
+						onclick={() => onopenFolder?.(folder)}
+						onkeydown={(event) => (event.key === 'Enter' || event.key === ' ') && onopenFolder?.(folder)}
+						role="button"
+						tabindex="0">
+						<div class="file-icon">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="24"
+								height="24"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+						</div>
+						<div class="file-info">
+							<span class="file-name">{folderName(folder)}</span>
+							<span class="file-path" title={folder}><bdi>{folder}</bdi></span>
+						</div>
+						<button class="clear-btn" onclick={(e) => onremoveRecentFolder?.(folder, e as MouseEvent)} title={t('home.removeFromHistory', settings.language)}>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+						</button>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 	{#if pinnedTags.length > 0}
 		<div class="recent-section">
 			<h3>{t('home.pinnedTags', settings.language)}</h3>
@@ -122,7 +197,7 @@
 						</div>
 						<div class="file-info">
 							<span class="file-name">{getFileName(file)}</span>
-							<span class="file-path" title={file}>{file}</span>
+							<span class="file-path" title={file}><bdi>{file}</bdi></span>
 						</div>
 						<button class="clear-btn" onclick={(e) => onremoveRecentFile(file, e as MouseEvent)} title={t('home.removeFromHistory', settings.language)}>
 							<svg
@@ -310,6 +385,8 @@
 		text-align: left;
 	}
 
+	/* `rtl` above keeps the end of a long path visible; the `<bdi>` inside keeps
+	   the path itself left-to-right, so its leading `/` is not moved to the end. */
 	/* `rtl` above keeps the end of a long path visible; a count is not a path, and rtl turns "3 个文件" into "个文件 3". */
 	.file-count {
 		direction: ltr;

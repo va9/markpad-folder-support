@@ -244,6 +244,7 @@ const DYNAMIC_FAMILIES: Record<string, { file: string; member: RegExp; why: stri
 // cannot see which caller it is looking at. Fix them where they are written.
 const UNTRANSLATED_TOASTS = new Map<string, string>([
 	['`${message}: ${String(error)}`', 'the two onError pass-throughs (see src/lib/sessions/)'],
+	['translated', "FolderSidebar's onerror/oninfo: the component builds every message with t() before handing it up"],
 ]);
 
 const KNOWN_INDIRECT_CALLS = new Set([

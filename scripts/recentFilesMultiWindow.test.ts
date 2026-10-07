@@ -244,7 +244,9 @@ test('every mutation goes through the read-modify-write helper', () => {
 	assert.match(viewer, /recentFiles = updateStoredRecentFiles\(\((\w+)\) => promoteRecentFile\(\1, path\)\)/);
 	assert.match(viewer, /recentFiles = updateStoredRecentFiles\(\((\w+)\) => dropRecentFile\(\1, path\)\)/);
 	assert.match(viewer, /recentFiles = updateStoredRecentFiles\(\((\w+)\) => renameRecentFile\(\1, oldPath, newPath\)\)/);
-	assert.equal(viewer.match(/updateStoredRecentFiles\(/g)?.length, 3, 'exactly three call sites, all of them shown above');
+	// The folder sidebar's rename, which moves every entry under a renamed folder.
+	assert.match(viewer, /recentFiles = updateStoredRecentFiles\(\((\w+)\) => moveRecentFiles\(\1, /);
+	assert.equal(viewer.match(/updateStoredRecentFiles\(/g)?.length, 4, 'exactly four call sites, all of them shown above');
 });
 
 test('nothing writes the key directly any more', () => {

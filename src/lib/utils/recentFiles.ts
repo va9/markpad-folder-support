@@ -2,6 +2,9 @@ import { writeStoredSetting } from '../stores/settings.svelte.js';
 
 const RECENT_FILES_KEY = 'recent-files';
 const RECENT_FILES_LIMIT = 9;
+/** Folders opened in the sidebar, listed on the home screen. Same storage rules. */
+const RECENT_FOLDERS_KEY = 'recent-folders';
+const RECENT_FOLDERS_LIMIT = 6;
 /**
  * How many times {@link updateStoredRecentFiles} will re-apply its mutation
  * over a sibling window's write before giving up. A cap rather than a loop
@@ -49,9 +52,26 @@ export function renameRecentFile(stored: readonly string[], oldPath: string, new
 	return dedupe(stored.map((file) => (file === oldPath ? newPath : file)));
 }
 
-export function readStoredRecentFiles(): string[] {
+function readStoredList(key: string): string[] {
 	if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return [];
-	return parseRecentFiles(localStorage.getItem(RECENT_FILES_KEY));
+	return parseRecentFiles(localStorage.getItem(key));
+}
+
+/**
+ * Follows a renamed file or folder: every entry `remap` moves gets its new
+ * path. The folder sidebar's rename hands in `remapPath`, so a renamed folder
+ * carries every recent file inside it along.
+ */
+export function moveRecentFiles(stored: readonly string[], remap: (path: string) => string | null): string[] {
+	return dedupe(stored.map((file) => remap(file) ?? file));
+}
+
+export function readStoredRecentFiles(): string[] {
+	return readStoredList(RECENT_FILES_KEY);
+}
+
+export function readStoredRecentFolders(): string[] {
+	return readStoredList(RECENT_FOLDERS_KEY);
 }
 
 /**
@@ -107,14 +127,28 @@ export function readStoredRecentFiles(): string[] {
  * "I am applying a remote change" flag is documented there.
  */
 export function updateStoredRecentFiles(mutate: (current: string[]) => string[]): string[] {
+	return updateStoredList(RECENT_FILES_KEY, RECENT_FILES_LIMIT, mutate);
+}
+
+/** {@link updateStoredRecentFiles} for the recent-folder list. */
+export function updateStoredRecentFolders(mutate: (current: string[]) => string[]): string[] {
+	return updateStoredList(RECENT_FOLDERS_KEY, RECENT_FOLDERS_LIMIT, mutate);
+}
+
+function updateStoredList(key: string, limit: number, mutate: (current: string[]) => string[]): string[] {
 	let next: string[] = [];
 	for (let attempt = 0; attempt < RECENT_FILES_WRITE_ATTEMPTS; attempt++) {
-		next = dedupe(mutate(readStoredRecentFiles())).slice(0, RECENT_FILES_LIMIT);
+		next = dedupe(mutate(readStoredList(key))).slice(0, limit);
 		const written = JSON.stringify(next);
-		writeStoredSetting(RECENT_FILES_KEY, written);
-		if (JSON.stringify(readStoredRecentFiles()) === written) break;
+		writeStoredSetting(key, written);
+		if (JSON.stringify(readStoredList(key)) === written) break;
 	}
 	return next;
+}
+
+function isStorageEventFor(key: string, event: Pick<StorageEvent, 'key' | 'storageArea'>): boolean {
+	if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function' && event.storageArea && event.storageArea !== localStorage) return false;
+	return event.key === null || event.key === key;
 }
 
 /**
@@ -122,6 +156,9 @@ export function updateStoredRecentFiles(mutate: (current: string[]) => string[])
  * A null key is localStorage being cleared wholesale.
  */
 export function isRecentFilesStorageEvent(event: Pick<StorageEvent, 'key' | 'storageArea'>): boolean {
-	if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function' && event.storageArea && event.storageArea !== localStorage) return false;
-	return event.key === null || event.key === RECENT_FILES_KEY;
+	return isStorageEventFor(RECENT_FILES_KEY, event);
+}
+
+export function isRecentFoldersStorageEvent(event: Pick<StorageEvent, 'key' | 'storageArea'>): boolean {
+	return isStorageEventFor(RECENT_FOLDERS_KEY, event);
 }

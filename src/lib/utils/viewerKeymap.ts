@@ -55,6 +55,8 @@ export type ViewerCommand =
 	| 'close-file'
 	| 'new-file'
 	| 'open-file'
+	| 'open-folder'
+	| 'toggle-folder-sidebar'
 	| 'app-exit'
 	| 'toggle-split-view'
 	| 'toggle-edit-view'
@@ -254,6 +256,10 @@ export function viewerCommandFor(e: KeyStroke, context: KeyContext): ViewerComma
 	// drift again; `formatShortcutKeymap.test.ts` holds them equal.
 	if (mod && (key === 't' || key === 'n')) return 'new-file';
 	if (mod && key === 'o') return 'open-file';
+	// `code`, not `key`, for the same reason as Zen: Option turns O into ø and
+	// B into ∫ on a Mac.
+	if (modAlt && code === 'KeyO') return 'open-folder';
+	if (modAlt && code === 'KeyB') return 'toggle-folder-sidebar';
 	if (mod && key === 'q') return 'app-exit';
 	if (mod && (code === 'Backslash' || code === 'IntlBackslash')) return 'toggle-split-view';
 	if (mod && key === 'e') return 'toggle-edit-view';

@@ -81,6 +81,8 @@
 		onsave,
 		onnew,
 		onopen,
+		onopenFolder,
+		ontoggleFolderSidebar,
 		onclose,
 		onreveal,
 		onexportPdf,
@@ -105,6 +107,8 @@
 		onsave?: () => void;
 		onnew?: () => void;
 		onopen?: () => void;
+		onopenFolder?: () => void;
+		ontoggleFolderSidebar?: () => void;
 		onclose?: () => void;
 		onreveal?: () => void;
 		onexportPdf?: () => void;
@@ -1734,6 +1738,26 @@
 				label: t('menu.openFile', lang),
 				keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO],
 				run: () => onopen?.(),
+			}),
+
+			editor.addAction({
+				id: "folder-open",
+				label: t('folder.openFolder', lang),
+				keybindings: [
+					monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyO,
+				],
+				keybindingContext: "!altGraphChord",
+				run: () => onopenFolder?.(),
+			}),
+
+			editor.addAction({
+				id: "folder-toggle-sidebar",
+				label: t('folder.toggleSidebar', lang),
+				keybindings: [
+					monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyB,
+				],
+				keybindingContext: "!altGraphChord",
+				run: () => ontoggleFolderSidebar?.(),
 			}),
 
 			editor.addAction({

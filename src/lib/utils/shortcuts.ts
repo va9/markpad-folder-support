@@ -147,6 +147,16 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
 		documentCommands: ['open-file'],
 	},
 	{
+		id: 'folder-open',
+		labelKey: 'folder.openFolder',
+		// `Mod+Alt+O`, not the `Mod+Shift+O` other editors use: Monaco binds that
+		// to Go to Symbol, and taking it would cost the editor its outline jump.
+		chords: ['Mod+Alt+O'],
+		group: 'file',
+		editorAction: true,
+		documentCommands: ['open-folder'],
+	},
+	{
 		id: 'file-save',
 		labelKey: 'menu.save',
 		chords: ['Mod+S'],
@@ -385,6 +395,16 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
 		chords: ['Mod+Shift+B'],
 		group: 'view',
 		editorAction: true,
+	},
+	{
+		id: 'folder-toggle-sidebar',
+		labelKey: 'folder.toggleSidebar',
+		// `Mod+B` is Bold and `Mod+Shift+B` the tab bar, so the sidebar takes the
+		// Alt variant of the letter every editor uses for it.
+		chords: ['Mod+Alt+B'],
+		group: 'view',
+		editorAction: true,
+		documentCommands: ['toggle-folder-sidebar'],
 	},
 	{
 		id: 'app-find',

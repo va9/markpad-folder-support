@@ -27,6 +27,11 @@
 		showHome,
 		onnewFile,
 		onopenFile,
+		onopenFolder,
+		ontoggleFolderSidebar,
+		hasFolder = false,
+		isFolderSidebarShown = false,
+		folderSidebarWidth = 0,
 		onmergeAllWindows,
 		onclosetag,
 		onsaveFile,
@@ -69,6 +74,17 @@
 		showHome: boolean;
 		onnewFile?: () => void;
 		onopenFile?: () => void;
+		onopenFolder?: () => void;
+		ontoggleFolderSidebar?: () => void;
+		/** This window has a folder open, so the sidebar toggle means something. */
+		hasFolder?: boolean;
+		isFolderSidebarShown?: boolean;
+		/**
+		 * Width of the folder sidebar below, or 0 when none is shown. The left
+		 * controls take exactly that width so the tab strip starts where the
+		 * document does, rather than running across the top of the tree.
+		 */
+		folderSidebarWidth?: number;
 		onmergeAllWindows?: () => void;
 		onclosetag?: () => void;
 		onsaveFile?: () => void;
@@ -440,7 +456,11 @@
 	{#if !isMac && !isWin11}
 		<div class="window-top-border"></div>
 	{/if}
-	<div class="window-controls-left" data-tauri-drag-region>
+	<div
+		class="window-controls-left"
+		class:over-folder-sidebar={folderSidebarWidth > 0}
+		style:width={folderSidebarWidth > 0 ? `${folderSidebarWidth}px` : null}
+		data-tauri-drag-region>
 		<div class="home-menu-container" role="presentation">
 			<button
 				class="icon-home-btn {homeMenuOpen ? 'active' : ''}"
@@ -518,6 +538,30 @@
 				{t('menu.openFile', currentLanguage)}
 				<span class="menu-shortcut">{shortcutLabel('file-open', modifier)}</span>
 			</button>
+			<button
+				class="home-menu-item"
+				onclick={() => {
+					homeMenuOpen = false;
+					onopenFolder?.();
+				}}>
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+					><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+				{t('folder.openFolder', currentLanguage)}
+				<span class="menu-shortcut">{shortcutLabel('folder-open', modifier)}</span>
+			</button>
+			{#if hasFolder}
+				<button
+					class="home-menu-item"
+					onclick={() => {
+						homeMenuOpen = false;
+						ontoggleFolderSidebar?.();
+					}}>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+						><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+					{t(isFolderSidebarShown ? 'folder.hideSidebar' : 'folder.showSidebar', currentLanguage)}
+					<span class="menu-shortcut">{shortcutLabel('folder-toggle-sidebar', modifier)}</span>
+				</button>
+			{/if}
 					{#if currentFile !== '' || (tabManager.activeTab && tabManager.activeTab.isEditing)}
 						<button
 						class="home-menu-item"
@@ -1256,6 +1300,16 @@
 
 	.custom-title-bar.native-mac .window-controls-left {
 		padding-left: 78px;
+	}
+
+	/* The title bar's share of the sidebar column: same width, background and
+	   edge as the sidebar under it, so the two read as one column. */
+	.window-controls-left.over-folder-sidebar {
+		flex: none;
+		align-self: stretch;
+		box-sizing: border-box;
+		background: var(--color-canvas-subtle);
+		border-right: 1px solid var(--color-border-default);
 	}
 
 	.title-actions-container {
